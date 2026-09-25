@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pantalla de arranque: fondo oscuro con el logo de SentriCam (evita el destello blanco). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/icono_fondo" />
+    <item>
+        <bitmap android:gravity="center" android:src="@drawable/logo_arranque" />
+    </item>
+</layer-list>

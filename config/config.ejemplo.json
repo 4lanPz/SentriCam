@@ -1,0 +1,35 @@
+{
+  "camarasPorPagina": 9,
+  "substream": true,
+  "rotacionSegundos": 0,
+  "pin": "",
+  "dvrs": [
+    {
+      "nombre": "DVR Almacén",
+      "host": "192.168.1.64",
+      "puerto": 554,
+      "puertoHttp": 80,
+      "usuario": "visor",
+      "clave": "CLAVE_AQUI",
+      "canales": ""
+    },
+    {
+      "nombre": "DVR Oficinas",
+      "host": "192.168.1.65",
+      "puerto": 554,
+      "puertoHttp": 80,
+      "usuario": "visor",
+      "clave": "CLAVE_AQUI",
+      "canales": "2, 5:Pasillo"
+    }
+  ],
+  "grupos": [
+    {
+      "nombre": "Planta 1",
+      "camaras": [
+        { "dvr": "DVR Almacén", "canal": 1 },
+        { "dvr": "DVR Oficinas", "canal": 2 }
+      ]
+    }
+  ]
+}
