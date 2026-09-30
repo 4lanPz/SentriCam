@@ -15,8 +15,14 @@ class ErrorDvr implements Exception {
 
   /// El DVR no ofrece esa consulta (404), típico de modelos antiguos.
   final bool noDisponible;
+
+  /// El DVR contestó (con un código de error): la red y el puerto están bien,
+  /// así que vale la pena probar otra consulta.
+  final bool respondio;
   const ErrorDvr(this.mensaje,
-      {this.deAcceso = false, this.noDisponible = false});
+      {this.deAcceso = false,
+      this.noDisponible = false,
+      this.respondio = false});
   @override
   String toString() => mensaje;
 }
@@ -172,12 +178,14 @@ Future<String> _obtener(Dvr dvr, String ruta) async {
             deAcceso: true);
       case 403:
         throw const ErrorDvr(
-            'El usuario no tiene permiso para consultar el DVR.');
+            'El usuario no tiene permiso para consultar el DVR.',
+            respondio: true);
       case 404:
         throw const ErrorDvr('El DVR no ofrece esta consulta.',
-            noDisponible: true);
+            noDisponible: true, respondio: true);
       default:
-        throw ErrorDvr('El DVR respondió con el error ${r.estado}.');
+        throw ErrorDvr('El DVR respondió con el error ${r.estado}.',
+            respondio: true);
     }
   } on ErrorDvr {
     rethrow;
@@ -228,28 +236,56 @@ List<Camara> parsearCanalesXml(String xml, String etiqueta) {
   return resultado;
 }
 
-/// Consultas de canales, de la más nueva a la más antigua.
-const _consultasCanales = [
+/// Consultas ISAPI de canales. Se hacen las dos y se juntan: un DVR híbrido
+/// tiene entradas analógicas y además cámaras IP (con su propio número de
+/// canal, p. ej. 17 o 33 en adelante); un NVR solo tiene cámaras IP.
+const _consultasIsapi = [
   ('/ISAPI/System/Video/inputs/channels', 'VideoInputChannel'),
   ('/ISAPI/ContentMgmt/InputProxy/channels', 'InputProxyChannel'),
-  // DVR antiguos, anteriores a ISAPI.
-  ('/PSIA/System/Video/inputs/channels', 'VideoInputChannel'),
 ];
 
-/// Pregunta al DVR qué canales tiene y cómo se llama cada uno.
-Future<List<Camara>> descubrirCanales(Dvr dvr) async {
-  var algunaRespondio = false;
-  for (final (ruta, etiqueta) in _consultasCanales) {
-    try {
-      final lista = parsearCanalesXml(await _obtener(dvr, ruta), etiqueta);
-      algunaRespondio = true;
-      if (lista.isNotEmpty) return lista;
-    } on ErrorDvr catch (e) {
-      // Red caída o clave mala: probar otra ruta no ayuda.
-      if (!e.noDisponible) rethrow;
+/// DVR antiguos, anteriores a ISAPI.
+const _consultaPsia =
+    ('/PSIA/System/Video/inputs/channels', 'VideoInputChannel');
+
+/// Junta listas de canales ordenadas por número; ante un número repetido
+/// queda el de la primera lista.
+List<Camara> unirCanales(List<List<Camara>> listas) {
+  final porCanal = <int, Camara>{};
+  for (final lista in listas) {
+    for (final c in lista) {
+      porCanal.putIfAbsent(c.canal, () => c);
     }
   }
-  if (algunaRespondio) return const [];
+  return porCanal.values.toList()..sort((a, b) => a.canal.compareTo(b.canal));
+}
+
+/// Pregunta al DVR qué canales tiene (analógicos y cámaras IP) y cómo se
+/// llama cada uno. Un equipo genérico no se consulta: sus canales se escriben.
+Future<List<Camara>> descubrirCanales(Dvr dvr) async {
+  if (dvr.marca != Marca.hikvision) return const [];
+  final listas = <List<Camara>>[];
+  ErrorDvr? error;
+  for (final (ruta, etiqueta) in _consultasIsapi) {
+    try {
+      listas.add(parsearCanalesXml(await _obtener(dvr, ruta), etiqueta));
+    } on ErrorDvr catch (e) {
+      // Clave mala (otro intento acerca el bloqueo) o DVR sin respuesta:
+      // probar otra consulta no ayuda.
+      if (e.deAcceso || !e.respondio) rethrow;
+      // Un equipo sin cámaras IP puede rechazar esa consulta; no es un error
+      // si la otra respondió.
+      if (!e.noDisponible) error ??= e;
+    }
+  }
+  if (listas.isNotEmpty) return unirCanales(listas);
+  final (ruta, etiqueta) = _consultaPsia;
+  try {
+    return parsearCanalesXml(await _obtener(dvr, ruta), etiqueta);
+  } on ErrorDvr catch (e) {
+    if (!e.noDisponible) rethrow;
+  }
+  if (error != null) throw error;
   throw const ErrorDvr(
       'Este DVR (probablemente un modelo antiguo) no permite consultar su lista de canales. '
       'Escribe los números de canal a mano, por ejemplo "1, 2, 3".',
@@ -405,7 +441,7 @@ Future<int?> _codigoDescribe(Dvr dvr, String ruta) async {
 
 Future<PasoPrueba> _probarVideo(Dvr dvr, int canal) async {
   final codigo =
-      await _codigoDescribe(dvr, '/Streaming/Channels/${canal * 100 + 2}');
+      await _codigoDescribe(dvr, dvr.rutaVideo(canal, substream: true));
   switch (codigo) {
     case 200:
       return PasoPrueba(true, 'Video del canal $canal: correcto.');
@@ -414,6 +450,9 @@ Future<PasoPrueba> _probarVideo(Dvr dvr, int canal) async {
           false,
           'Video: usuario o contraseña rechazados (o la TV quedó bloqueada '
           '~30 min por intentos fallidos).');
+    case 404 when dvr.marca == Marca.generico:
+      return PasoPrueba(false,
+          'Video del canal $canal: no existe. Revisa la ruta y el número de canal.');
     case 404:
       final antigua =
           await _codigoDescribe(dvr, '/h264/ch$canal/sub/av_stream');
@@ -439,9 +478,17 @@ class ResultadoPrueba {
 }
 
 /// Prueba completa de un DVR para diagnosticar por qué no se ve una cámara.
+/// Un equipo genérico solo se prueba por RTSP (no tiene consulta de canales).
 Future<ResultadoPrueba> probarDvr(Dvr dvr) async {
   final rtsp = await _probarRtsp(dvr);
   final pasos = <PasoPrueba>[rtsp];
+  if (dvr.marca == Marca.generico) {
+    if (rtsp.ok) {
+      final canal = dvr.camaras.isNotEmpty ? dvr.camaras.first.canal : 1;
+      pasos.add(await _probarVideo(dvr, canal));
+    }
+    return ResultadoPrueba(pasos, const []);
+  }
   var canales = const <Camara>[];
   var claveRechazada = false;
   try {

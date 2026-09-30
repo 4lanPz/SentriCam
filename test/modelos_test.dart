@@ -108,4 +108,58 @@ void main() {
     expect(vuelta.hardware, isFalse);
     expect(vuelta.sinDvr('A').hardware, isFalse);
   });
+
+  group('equipo genérico', () {
+    Dvr generico(
+            {String alta = '/cam/realmonitor?channel={canal}&subtype=0',
+            String liviana = '/cam/realmonitor?channel={canal}&subtype=1',
+            String canales = '1, 3:Porton'}) =>
+        Dvr.fromJson({
+          'nombre': 'G',
+          'marca': 'generico',
+          'host': '192.168.1.80',
+          'puerto': 554,
+          'usuario': 'admin',
+          'clave': 'a@b',
+          'canales': canales,
+          'rutaPrincipal': alta,
+          'rutaLiviana': liviana,
+        });
+
+    test('arma la URL con la ruta escrita y el número de canal', () {
+      final d = generico();
+      expect(d.urlRtsp(3, substream: false),
+          'rtsp://admin:a%40b@192.168.1.80:554/cam/realmonitor?channel=3&subtype=0');
+      expect(d.rutaVideo(3, substream: true),
+          '/cam/realmonitor?channel=3&subtype=1');
+      // Sin ruta liviana usa la de calidad alta.
+      expect(generico(liviana: '').rutaVideo(2, substream: true),
+          '/cam/realmonitor?channel=2&subtype=0');
+    });
+
+    test('se conserva por JSON y un DVR sin marca es Hikvision', () {
+      final vuelta = Dvr.fromJson(generico().toJson());
+      expect(vuelta.marca, Marca.generico);
+      expect(vuelta.rutaLiviana, '/cam/realmonitor?channel={canal}&subtype=1');
+      final hik = _dvr('H', '192.168.1.10');
+      expect(Dvr.fromJson(hik.toJson()).marca, Marca.hikvision);
+      expect(hik.toJson().containsKey('rutaPrincipal'), isFalse);
+      expect(
+          hik.urlRtsp(3, substream: true), endsWith('/Streaming/Channels/302'));
+      expect(() => Dvr.fromJson({'nombre': 'X', 'marca': 'otra'}),
+          throwsFormatException);
+    });
+
+    test('exige ruta válida y canales escritos', () {
+      ConfigApp config(Dvr d) => ConfigApp(dvrs: [d]);
+      expect(() => config(generico()).validar(), returnsNormally);
+      for (final mala in ['', 'cam/1', '/con espacio', '/u@x']) {
+        expect(() => config(generico(alta: mala)).validar(exigirCanales: false),
+            throwsFormatException,
+            reason: mala);
+      }
+      expect(() => config(generico(canales: '')).validar(exigirCanales: false),
+          throwsFormatException);
+    });
+  });
 }

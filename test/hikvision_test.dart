@@ -27,6 +27,15 @@ void main() {
     expect(r.single.nombre, 'Andén 1');
   });
 
+  test('DVR híbrido: junta analógicas y cámaras IP sin repetir canales', () {
+    final analogicas = [const Camara(2, 'Patio'), const Camara(1, 'Entrada')];
+    final ip = [const Camara(17, 'IP Puerta'), const Camara(2, 'Duplicado')];
+    final r = unirCanales([analogicas, ip]);
+    expect(r.map((c) => c.canal), [1, 2, 17]);
+    expect(r.map((c) => c.nombre), ['Entrada', 'Patio', 'IP Puerta']);
+    expect(unirCanales([const [], ip]).map((c) => c.canal), [2, 17]);
+  });
+
   test('un canal sin nombre queda vacío para completarse con el del DVR', () {
     final r = parsearCamaras('1, 3:Patio, 5');
     expect(r.map((c) => c.canal), [1, 3, 5]);

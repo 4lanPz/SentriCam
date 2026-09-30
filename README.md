@@ -50,6 +50,7 @@ Todo funciona **dentro de tu red local**: la app no usa servidores externos, ni 
 - **Android 7.0 o superior** (Android TV, TV box, tablet o celular).
 - DVR o NVR **Hikvision** (o compatible) con **RTSP** activado, en la misma red local que la TV.
 - Para los nombres automáticos de las cámaras, el DVR debe tener la web activa (puerto 80, ISAPI). Si no la tiene, igual puedes escribir los números de canal a mano.
+- Otras marcas: como extra, cualquier equipo con RTSP se puede agregar como *Genérico*, escribiendo su ruta de video y sus canales.
 
 > Algunos DVR muy antiguos no tienen RTSP (solo se ven con iVMS/SDK); esos no son compatibles.
 
@@ -83,7 +84,8 @@ Todo funciona **dentro de tu red local**: la app no usa servidores externos, ni 
    - **IP** del DVR.
    - **Puerto**: el de video RTSP, normalmente `554`.
    - **Usuario** y **contraseña** del DVR.
-   - **Canales**: vacío para todos, o por ejemplo `1-8, 12`. Los nombres se toman del DVR.
+   - **Canales**: vacío para todos (analógicas y cámaras IP), o por ejemplo `1-8, 12`. Los nombres se toman del DVR.
+   - **Marca**: *Hikvision* para todo lo anterior. *Genérico (RTSP)* es un extra para equipos de otra marca: escribes la ruta RTSP del video (con `{canal}` en lugar del número, por ejemplo `/cam/realmonitor?channel={canal}&subtype=0`) y los canales a mano; no se toman nombres ni se consulta la lista de canales.
 4. Pulsa **Probar** para comprobar la conexión y luego **Guardar** para dejar el DVR en la lista. Repite con cada DVR.
 5. (Opcional) Crea **grupos** marcando las cámaras de cada uno.
 6. En **Pantalla**, elige cuántas cámaras por página, el cambio automático de página, la calidad, la decodificación y un PIN si lo quieres.
@@ -127,6 +129,7 @@ En pantallas táctiles también puedes cambiar de página deslizando hacia los l
 python tool/probar_dvr.py 192.168.1.64 -u usuario
 python tool/probar_dvr.py 192.168.1.64 -u usuario --canal 3
 python tool/probar_dvr.py 192.168.1.64 --escanear    # busca RTSP en todos los puertos
+python tool/probar_dvr.py 192.168.1.64 -u usuario --todos   # revisa las dos calidades de cada canal
 ```
 
 ## Compilar desde el código

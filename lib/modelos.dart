@@ -4,8 +4,22 @@ class Camara {
   const Camara(this.canal, this.nombre);
 }
 
+/// Hikvision: direcciones de video, nombres de canales y prueba completa.
+/// Genérico: cualquier equipo con RTSP; las rutas y los canales se escriben.
+enum Marca {
+  hikvision,
+  generico;
+
+  static Marca desdeTexto(String? t) => switch ((t ?? '').trim()) {
+        '' || 'hikvision' => Marca.hikvision,
+        'generico' => Marca.generico,
+        _ => throw FormatException('marca desconocida "$t"'),
+      };
+}
+
 class Dvr {
   final String nombre;
+  final Marca marca;
   final String host;
   final int puerto;
   final int puertoHttp;
@@ -13,55 +27,73 @@ class Dvr {
   final String clave;
   final List<Camara> camaras;
 
+  /// Solo genérico: ruta RTSP (desde la "/") de cada calidad; `{canal}` se
+  /// reemplaza por el número de canal. Sin ruta liviana se usa la principal.
+  final String rutaPrincipal;
+  final String rutaLiviana;
+
   const Dvr({
     required this.nombre,
+    this.marca = Marca.hikvision,
     required this.host,
     required this.puerto,
     this.puertoHttp = 80,
     required this.usuario,
     required this.clave,
     required this.camaras,
+    this.rutaPrincipal = '',
+    this.rutaLiviana = '',
   });
 
-  /// Formato Hikvision: canal * 100 + 1 (principal) o + 2 (substream).
+  /// Ruta de video sin credenciales, p. ej. para probar la conexión.
+  /// Hikvision: canal * 100 + 1 (principal) o + 2 (substream).
+  String rutaVideo(int canal, {required bool substream}) => switch (marca) {
+        Marca.hikvision =>
+          '/Streaming/Channels/${canal * 100 + (substream ? 2 : 1)}',
+        Marca.generico =>
+          (substream && rutaLiviana.isNotEmpty ? rutaLiviana : rutaPrincipal)
+              .replaceAll('{canal}', '$canal'),
+      };
+
   String urlRtsp(int canal, {required bool substream}) {
     final u = Uri.encodeComponent(usuario);
     final c = Uri.encodeComponent(clave);
-    final flujo = canal * 100 + (substream ? 2 : 1);
-    return 'rtsp://$u:$c@$host:$puerto/Streaming/Channels/$flujo';
+    return 'rtsp://$u:$c@$host:$puerto${rutaVideo(canal, substream: substream)}';
   }
 
   String get canalesTexto =>
       camaras.map((c) => '${c.canal}:${c.nombre}').join(', ');
 
-  Dvr conClave(String nuevaClave) => Dvr(
+  Dvr _copiar({String? clave, List<Camara>? camaras}) => Dvr(
         nombre: nombre,
+        marca: marca,
         host: host,
         puerto: puerto,
         puertoHttp: puertoHttp,
         usuario: usuario,
-        clave: nuevaClave,
-        camaras: camaras,
+        clave: clave ?? this.clave,
+        camaras: camaras ?? this.camaras,
+        rutaPrincipal: rutaPrincipal,
+        rutaLiviana: rutaLiviana,
       );
 
-  Dvr conCamaras(List<Camara> nuevas) => Dvr(
-        nombre: nombre,
-        host: host,
-        puerto: puerto,
-        puertoHttp: puertoHttp,
-        usuario: usuario,
-        clave: clave,
-        camaras: nuevas,
-      );
+  Dvr conClave(String nuevaClave) => _copiar(clave: nuevaClave);
+
+  Dvr conCamaras(List<Camara> nuevas) => _copiar(camaras: nuevas);
 
   Map<String, dynamic> toJson({bool incluirClave = true}) => {
         'nombre': nombre,
+        'marca': marca.name,
         'host': host,
         'puerto': puerto,
         'puertoHttp': puertoHttp,
         'usuario': usuario,
         'clave': incluirClave ? clave : '',
         'canales': canalesTexto,
+        if (marca == Marca.generico) ...{
+          'rutaPrincipal': rutaPrincipal,
+          'rutaLiviana': rutaLiviana,
+        },
       };
 
   factory Dvr.fromJson(Map<String, dynamic> j) {
@@ -69,18 +101,26 @@ class Dvr {
     try {
       return Dvr(
         nombre: nombre,
+        marca: Marca.desdeTexto(j['marca'] as String?),
         host: (j['host'] as String?)?.trim() ?? '',
         puerto: (j['puerto'] as num?)?.toInt() ?? 554,
         puertoHttp: (j['puertoHttp'] as num?)?.toInt() ?? 80,
         usuario: (j['usuario'] as String?)?.trim() ?? '',
         clave: (j['clave'] as String?) ?? '',
         camaras: parsearCamaras((j['canales'] as String?) ?? ''),
+        rutaPrincipal: (j['rutaPrincipal'] as String?)?.trim() ?? '',
+        rutaLiviana: (j['rutaLiviana'] as String?)?.trim() ?? '',
       );
     } on FormatException catch (e) {
       throw FormatException('$nombre: ${e.message}');
     }
   }
 }
+
+/// Ruta RTSP escrita a mano: empieza con "/", sin espacios ni "@" (el usuario
+/// y la contraseña van aparte) y con caracteres imprimibles.
+bool rutaRtspValida(String ruta) =>
+    ruta.length <= 200 && RegExp(r'^/[!-?A-~]*$').hasMatch(ruta);
 
 /// Una cámara concreta de un DVR concreto, tal como se muestra en pantalla.
 class VistaRef {
@@ -344,6 +384,21 @@ class ConfigApp {
       }
       if (d.clave.isEmpty) {
         throw FormatException('${d.nombre}: falta la contraseña');
+      }
+      if (d.marca == Marca.generico) {
+        if (!rutaRtspValida(d.rutaPrincipal)) {
+          throw FormatException(
+              '${d.nombre}: la ruta de calidad alta debe empezar con "/" y no llevar espacios ni "@"');
+        }
+        if (d.rutaLiviana.isNotEmpty && !rutaRtspValida(d.rutaLiviana)) {
+          throw FormatException(
+              '${d.nombre}: la ruta de calidad liviana debe empezar con "/" y no llevar espacios ni "@"');
+        }
+        // No se le puede preguntar sus canales: hay que escribirlos.
+        if (d.camaras.isEmpty) {
+          throw FormatException(
+              '${d.nombre}: escribe los canales (por ejemplo "1-4")');
+        }
       }
       if (exigirCanales && d.camaras.isEmpty) {
         throw FormatException('${d.nombre}: no tiene canales');

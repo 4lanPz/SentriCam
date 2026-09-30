@@ -4,6 +4,16 @@ Todas las versiones de SentriCam. Los APK de cada versión están en [Releases](
 
 [English below](#changelog-english)
 
+## [1.1.0] - 2026-09-30
+
+### Corregido
+- DVR híbridos (analógicas + cámaras IP): ahora aparecen también las cámaras IP. Antes solo se tomaban las analógicas y las IP había que escribirlas a mano.
+  - Un DVR ya guardado conserva sus canales: agrega el número de la cámara IP en **Canales** (por ejemplo `1-16, 17`) o deja el campo vacío y vuelve a guardar.
+
+### Agregado
+- Marca **Genérico (RTSP)** como extra para equipos de otras marcas: se escribe la ruta de video y los canales.
+- `tool/probar_dvr.py --todos`: revisa la calidad liviana y alta de todos los canales y dice cuáles fallan.
+
 ## [1.0.1] - 2026-09-30
 
 Versión de correcciones. Se instala encima de la 1.0.0 sin perder la configuración.
@@ -38,6 +48,16 @@ Primera versión pública.
 ---
 
 ## Changelog (English)
+
+## [1.1.0] - 2026-09-30
+
+### Fixed
+- Hybrid DVRs (analog + IP cameras): IP cameras now show up too. Before, only the analog channels were read and IP cameras had to be typed by hand.
+  - An already saved DVR keeps its channels: add the IP camera number to **Canales** (Channels), for example `1-16, 17`, or leave the field empty and save again.
+
+### Added
+- **Genérico (RTSP)** (Generic) brand as an extra for other brands: you type the video path and the channels.
+- `tool/probar_dvr.py --todos`: checks light and high quality on every channel and reports which ones fail.
 
 ## [1.0.1] - 2026-09-30
 

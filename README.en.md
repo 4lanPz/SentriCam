@@ -52,6 +52,7 @@ Everything works **inside your local network**: the app uses no external servers
 - **Android 7.0 or later** (Android TV, TV box, tablet or phone).
 - A **Hikvision** (or compatible) DVR or NVR with **RTSP** enabled, on the same local network as the TV.
 - For automatic camera names, the DVR's web service must be enabled (port 80, ISAPI). If it isn't, you can still type the channel numbers by hand.
+- Other brands: as an extra, any device with RTSP can be added as *Generic* by typing its video path and channels.
 
 > Some very old DVRs have no RTSP (they can only be viewed with iVMS/SDK); those are not supported.
 
@@ -85,7 +86,8 @@ Everything works **inside your local network**: the app uses no external servers
    - **IP** of the DVR.
    - **Puerto** (Port): the RTSP video port, usually `554`.
    - **Usuario** and **Contraseña** (username and password) of the DVR.
-   - **Canales** (Channels): leave empty for all of them, or for example `1-8, 12`. Names are taken from the DVR.
+   - **Canales** (Channels): leave empty for all of them (analog and IP cameras), or for example `1-8, 12`. Names are taken from the DVR.
+   - **Marca** (Brand): *Hikvision* for everything above. *Genérico (RTSP)* (Generic) is an extra for other brands: you type the RTSP video path (with `{canal}` instead of the channel number, for example `/cam/realmonitor?channel={canal}&subtype=0`) and the channels by hand; names and the channel list are not read from the device.
 4. Press **Probar** (Test) to check the connection, then **Guardar** (Save) to add the DVR to the list. Repeat for each DVR.
 5. (Optional) Create **groups** by ticking the cameras for each one.
 6. Under **Pantalla** (Display), choose cameras per page, automatic page switching, quality, decoding and an optional PIN.
@@ -129,6 +131,7 @@ On touch screens you can also swipe sideways to change page.
 python tool/probar_dvr.py 192.168.1.64 -u username
 python tool/probar_dvr.py 192.168.1.64 -u username --canal 3
 python tool/probar_dvr.py 192.168.1.64 --escanear    # look for RTSP on every port
+python tool/probar_dvr.py 192.168.1.64 -u username --todos   # check both qualities of every channel
 ```
 
 ## Building from source

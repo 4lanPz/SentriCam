@@ -39,6 +39,9 @@ label>input,label>select{margin-top:4px;color:var(--texto)}
 .c-puerto{--base:5rem;--max:6rem}
 .c-usuario,.c-clave{--base:8.5rem;--max:15rem}
 .c-canales{--base:8.5rem;--max:14rem}
+.c-marca{--base:8rem;--max:10rem}
+.c-ruta{--base:16rem;--max:28rem}
+.campos .nota{flex-basis:100%;color:var(--suave);font-size:13px;overflow-wrap:anywhere}
 .pie{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
 .dvr>.pie:first-child{margin-top:0}
 .acciones{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
@@ -213,7 +216,8 @@ function cargar(c) {
   dvrs = (c.dvrs || []).map(d => {
     let lista = [];
     try { lista = parsearCanales(d.canales || ""); } catch (e) {}
-    return {id: sigId++, nombre: d.nombre, host: d.host, puerto: d.puerto || 554, puertoHttp: d.puertoHttp || 80,
+    return {id: sigId++, nombre: d.nombre, marca: d.marca || "hikvision", host: d.host, puerto: d.puerto || 554,
+      puertoHttp: d.puertoHttp || 80, rutaPrincipal: d.rutaPrincipal || "", rutaLiviana: d.rutaLiviana || "",
       usuario: d.usuario, clave: "", canales: compactar(lista.map(x => x.canal)),
       conocidos: new Map(lista.map(x => [x.canal, x.nombre])),
       claveGuardada: true, hostOriginal: d.host, usuarioOriginal: d.usuario,
@@ -252,7 +256,8 @@ async function conectar() {
 
 // ---------- DVRs
 function nuevoDvr() {
-  dvrs.push({id: sigId++, nombre: "", host: "", puerto: 554, puertoHttp: 80, usuario: "admin", clave: "", canales: "",
+  dvrs.push({id: sigId++, nombre: "", marca: "hikvision", host: "", puerto: 554, puertoHttp: 80,
+    rutaPrincipal: "", rutaLiviana: "", usuario: "admin", clave: "", canales: "",
     conocidos: new Map(), claveGuardada: false, hostOriginal: "", usuarioOriginal: "",
     editando: true, prueba: null, error: ""});
 }
@@ -270,12 +275,24 @@ function validarDvr(d) {
     if (!mismaCuenta) return d.claveGuardada ? "Cambiaste la IP o el usuario: escribe la contraseña de nuevo." : "Escribe la contraseña.";
   }
   try { parsearCanales(d.canales); } catch (e) { return "Canales: " + e.message; }
+  if (d.marca === "generico") {
+    if (!rutaValida(d.rutaPrincipal)) return "Ruta de calidad alta: debe empezar con \"/\", sin espacios ni \"@\".";
+    if (d.rutaLiviana.trim() && !rutaValida(d.rutaLiviana)) return "Ruta de calidad liviana: debe empezar con \"/\", sin espacios ni \"@\".";
+    if (!d.canales.trim()) return "Escribe los canales (un equipo genérico no informa cuáles tiene).";
+  }
   return "";
 }
 
+// Igual que rutaRtspValida en la app.
+function rutaValida(r) {
+  const t = r.trim();
+  return t.length <= 200 && /^\/[!-?A-~]*$/.test(t);
+}
+
 function datosDvr(d) {
-  return {nombre: d.nombre.trim(), host: d.host.trim(), puerto: Number(d.puerto), puertoHttp: d.puertoHttp,
-    usuario: d.usuario.trim(), clave: d.clave, canales: d.canales.trim()};
+  return {nombre: d.nombre.trim(), marca: d.marca, host: d.host.trim(), puerto: Number(d.puerto), puertoHttp: d.puertoHttp,
+    usuario: d.usuario.trim(), clave: d.clave, canales: d.canales.trim(),
+    rutaPrincipal: d.rutaPrincipal.trim(), rutaLiviana: d.rutaLiviana.trim()};
 }
 
 async function probarDvr(d) {
@@ -304,7 +321,8 @@ function guardarDvr(d) {
 }
 
 function editarDvr(d) {
-  d.respaldo = {nombre: d.nombre, host: d.host, puerto: d.puerto, usuario: d.usuario, clave: d.clave, canales: d.canales};
+  d.respaldo = {nombre: d.nombre, marca: d.marca, host: d.host, puerto: d.puerto, usuario: d.usuario, clave: d.clave,
+    canales: d.canales, rutaPrincipal: d.rutaPrincipal, rutaLiviana: d.rutaLiviana};
   d.editando = true;
   pintarDvrs();
 }
@@ -387,15 +405,28 @@ function pintarDvrs() {
     llenarAvisos(avisos, d);
     let caja;
     if (d.editando) {
+      const generico = d.marca === "generico";
+      const marca = el("select", {onchange: e => {
+        d.marca = e.target.value; sinGuardar = true; d.prueba = null; d.error = ""; pintarDvrs();
+      }}, el("option", {value: "hikvision", texto: "Hikvision"}), el("option", {value: "generico", texto: "Genérico (RTSP)"}));
+      marca.value = d.marca;
       caja = el("div", {clase: "dvr"},
         el("div", {clase: "campos"},
+          el("label", {clase: "c-marca"}, "Marca", marca),
           campo(d, "nombre", "Nombre", "c-nombre", {placeholder: "Ej.: Planta 1"}),
           campo(d, "host", "IP", "c-ip", {placeholder: "192.168.1.64", inputMode: "decimal", maxLength: 15}),
           campo(d, "puerto", "Puerto", "c-puerto", {inputMode: "numeric", maxLength: 5}),
           campo(d, "usuario", "Usuario", "c-usuario", {autocomplete: "off"}),
           campo(d, "clave", "Contraseña", "c-clave", {type: "password", autocomplete: "new-password",
             placeholder: d.claveGuardada ? "(sin cambios)" : ""}),
-          campo(d, "canales", "Canales", "c-canales", {placeholder: "todos"})),
+          campo(d, "canales", "Canales", "c-canales", {placeholder: generico ? "obligatorio, ej.: 1-4" : "todos"}),
+          generico ? campo(d, "rutaPrincipal", "Ruta calidad alta", "c-ruta",
+            {placeholder: "/cam/realmonitor?channel={canal}&subtype=0", autocomplete: "off", spellcheck: false}) : null,
+          generico ? campo(d, "rutaLiviana", "Ruta calidad liviana (opcional)", "c-ruta",
+            {placeholder: "/cam/realmonitor?channel={canal}&subtype=1", autocomplete: "off", spellcheck: false}) : null,
+          generico ? el("div", {clase: "nota", texto: "Ruta RTSP del video desde la \"/\": {canal} se reemplaza por el número de canal. " +
+            "Búscala en el manual del equipo. Ejemplos: Dahua /cam/realmonitor?channel={canal}&subtype=0 (alta) y subtype=1 (liviana); " +
+            "Uniview /unicast/c{canal}/s0/live (alta) y s1 (liviana). Los nombres no se toman del equipo: escríbelos como 1:Entrada."}) : null),
         el("div", {clase: "pie"}, estado,
           el("span", {clase: "acciones"}, probar,
             el("button", {clase: "primario", texto: "Guardar", onclick: () => guardarDvr(d)}),
@@ -404,7 +435,8 @@ function pintarDvrs() {
               : el("button", {clase: "peligro", texto: "Eliminar", onclick: () => eliminarDvr(d)}))),
         avisos);
     } else {
-      const datos = `${d.host}:${d.puerto} · ${d.usuario} · canales: ${d.canales || "todos"}`;
+      const datos = (d.marca === "generico" ? "Genérico · " : "") +
+        `${d.host}:${d.puerto} · ${d.usuario} · canales: ${d.canales || "todos"}`;
       caja = el("div", {clase: "dvr"},
         el("div", {clase: "pie"},
           el("span", {clase: "resumen"}, el("b", {texto: d.nombre}), estado, el("span", {clase: "datos", texto: datos})),

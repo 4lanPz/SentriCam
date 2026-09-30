@@ -245,6 +245,10 @@ class No404(RuntimeError):
     pass
 
 
+class Grave(RuntimeError):
+    """Sin conexión o clave rechazada: probar otra consulta no ayuda."""
+
+
 def consultar(host, puerto_http, usuario, clave, ruta, informar):
     try:
         estado, desafios, cuerpo = http_get(host, puerto_http, ruta)
@@ -256,12 +260,12 @@ def consultar(host, puerto_http, usuario, clave, ruta, informar):
             if a.disponible():
                 estado, _, cuerpo = http_get(host, puerto_http, ruta, a.cabecera("GET", ruta))
     except (OSError, http.client.HTTPException):
-        raise RuntimeError(f"no se pudo conectar a {host}:{puerto_http} (revisa la IP, la red y el puerto HTTP)")
+        raise Grave(f"no se pudo conectar a {host}:{puerto_http} (revisa la IP, la red y el puerto HTTP)")
     if estado == 200:
         return cuerpo
     if estado == 401:
-        raise RuntimeError("usuario o contraseña incorrectos, o ESTE equipo está bloqueado por intentos "
-                           "fallidos (el DVR bloquea por IP ~30 min)")
+        raise Grave("usuario o contraseña incorrectos, o ESTE equipo está bloqueado por intentos "
+                    "fallidos (el DVR bloquea por IP ~30 min)")
     if estado == 403:
         raise RuntimeError("el usuario no tiene permiso")
     if estado == 404:
@@ -284,32 +288,44 @@ def parsear_canales(xml, etiqueta):
     return dict(sorted(canales.items()))
 
 
-CONSULTAS = [
-    ("/ISAPI/System/Video/inputs/channels", "VideoInputChannel", "ISAPI"),
-    ("/ISAPI/ContentMgmt/InputProxy/channels", "InputProxyChannel", "ISAPI cámaras IP"),
-    ("/PSIA/System/Video/inputs/channels", "VideoInputChannel", "PSIA (modelo antiguo)"),
+# Un DVR híbrido tiene entradas analógicas y además cámaras IP (con su propio
+# número de canal); un NVR solo cámaras IP. Se consultan las dos y se juntan.
+CONSULTAS_ISAPI = [
+    ("/ISAPI/System/Video/inputs/channels", "VideoInputChannel", "Entradas analógicas (ISAPI)", "analógica"),
+    ("/ISAPI/ContentMgmt/InputProxy/channels", "InputProxyChannel", "Cámaras IP (ISAPI)", "IP"),
 ]
+CONSULTA_PSIA = ("/PSIA/System/Video/inputs/channels", "VideoInputChannel", "PSIA (modelo antiguo)", "analógica")
 
 
 def probar_web(host, puerto_http, usuario, clave):
+    """Devuelve {canal: (nombre, tipo)}; None si la clave o la conexión fallan."""
     print(f"\n== 2. Acceso web (puerto {puerto_http}) y canales ==")
-    alguna = False
-    for i, (ruta, etiqueta, nombre) in enumerate(CONSULTAS):
+    canales = {}
+    respondio = False
+    for i, (ruta, etiqueta, nombre, tipo) in enumerate(CONSULTAS_ISAPI + [CONSULTA_PSIA]):
+        if i == len(CONSULTAS_ISAPI) and respondio:
+            break  # PSIA solo si ISAPI no existe
         try:
-            canales = parsear_canales(consultar(host, puerto_http, usuario, clave, ruta, i == 0), etiqueta)
+            lista = parsear_canales(consultar(host, puerto_http, usuario, clave, ruta, i == 0), etiqueta)
         except No404:
             print(f"  {nombre}: no disponible (404)")
             continue
-        except RuntimeError as e:
+        except Grave as e:
             print(f"  FALLA: {e}")
             return None
-        alguna = True
-        if canales:
-            print(f"  OK vía {nombre}: usuario y contraseña correctos. {len(canales)} canales:")
-            for c, n in canales.items():
-                print(f"    {c}: {n or '(sin nombre)'}")
-            return canales
-    if alguna:
+        except RuntimeError as e:
+            print(f"  {nombre}: {e}")
+            continue
+        respondio = True
+        print(f"  {nombre}: {len(lista)} canales")
+        for c, n in lista.items():
+            canales.setdefault(c, (n, tipo))
+    if canales:
+        print(f"  OK: usuario y contraseña correctos. {len(canales)} canales en total:")
+        for c, (n, tipo) in sorted(canales.items()):
+            print(f"    {c:>3} [{tipo}] {n or '(sin nombre)'}")
+        return dict(sorted(canales.items()))
+    if respondio:
         print("  OK: usuario y contraseña correctos, pero el DVR no devolvió canales.")
         return {}
     print("  El DVR no permite consultar su lista de canales (modelo antiguo). En la app, "
@@ -398,6 +414,56 @@ class Rtsp:
             self.s.close()
         except OSError:
             pass
+
+
+def codigo_describe(host, puerto, usuario, clave, ruta):
+    """Código RTSP de DESCRIBE (autenticándose si hace falta), o None si no hubo respuesta."""
+    uri = f"rtsp://{host}:{puerto}{ruta}"
+    try:
+        r = Rtsp(host, puerto)
+    except OSError:
+        return None
+    try:
+        estado, h, _ = r.pedir("DESCRIBE", uri, {"Accept": "application/sdp"})
+        if " 401" in estado:
+            a = Autenticacion(usuario, clave)
+            a.cargar(h.get("www-authenticate", []))
+            if a.disponible():
+                estado, _, _ = r.pedir("DESCRIBE", uri, {"Accept": "application/sdp"},
+                                       a.cabecera("DESCRIBE", uri))
+        partes = estado.split()
+        return int(partes[1]) if len(partes) > 1 and partes[1].isdigit() else None
+    except (OSError, ConnectionError, ValueError):
+        return None
+    finally:
+        r.cerrar()
+
+
+def probar_todos(host, puerto, usuario, clave, canales):
+    """Pide cada canal en calidad liviana (N02) y alta (N01), sin descargar video."""
+    print(f"\n== 4. Calidad liviana y alta de cada canal ({len(canales)}) ==")
+    print("  Canal  Tipo       Liviana  Alta     Nombre")
+    sin_liviana, sin_nada = [], []
+    texto = lambda c: "OK" if c == 200 else (f"error {c}" if c else "sin resp.")
+    for canal, (nombre, tipo) in canales.items():
+        sub = codigo_describe(host, puerto, usuario, clave, f"/Streaming/Channels/{canal * 100 + 2}")
+        alta = codigo_describe(host, puerto, usuario, clave, f"/Streaming/Channels/{canal * 100 + 1}")
+        print(f"  {canal:>5}  {tipo:<10} {texto(sub):<8} {texto(alta):<8} {nombre}")
+        if sub == 401 or alta == 401:
+            print("  RESULTADO: usuario o contraseña rechazados por RTSP; se detiene para no bloquear la cuenta.")
+            return
+        if sub != 200 and alta == 200:
+            sin_liviana.append(canal)
+        elif sub != 200 and alta != 200:
+            sin_nada.append(canal)
+    if sin_liviana:
+        print(f"\n  Sin calidad liviana: {', '.join(map(str, sin_liviana))}. En la cuadrícula saldrán con error: "
+              "revisa su subflujo (H.264, 640x480, 15 fps), desde el NVR si la cámara no guarda el cambio.")
+    if sin_nada:
+        print(f"\n  Sin video en ninguna calidad: {', '.join(map(str, sin_nada))} "
+              "(cámara desconectada o número de canal distinto al de la lista).")
+    if not sin_liviana and not sin_nada:
+        print("\n  Todos los canales entregan las dos calidades.")
 
 
 def probar_rtsp(host, puerto, usuario, clave, canal, flujo):
@@ -491,6 +557,8 @@ def main():
                     help="busca el puerto RTSP entre TODOS los puertos (1-65535)")
     ap.add_argument("--principal", action="store_true", help="prueba calidad principal en vez de substream")
     ap.add_argument("--vlc", action="store_true", help="abre VLC con el video (usa la contraseña ingresada)")
+    ap.add_argument("--todos", action="store_true",
+                    help="revisa la calidad liviana y alta de TODOS los canales del DVR")
     a = ap.parse_args()
 
     try:
@@ -538,6 +606,11 @@ def main():
     canales = probar_web(a.host, a.http, a.usuario, clave)
     if rtsp is not None:
         probar_rtsp(a.host, rtsp, a.usuario, clave, a.canal, 1 if a.principal else 2)
+    if a.todos and rtsp is not None:
+        if canales:
+            probar_todos(a.host, rtsp, a.usuario, clave, canales)
+        else:
+            print("\n--todos necesita la lista de canales del DVR (acceso web correcto).")
 
     if a.vlc and rtsp is not None:
         from urllib.parse import quote
