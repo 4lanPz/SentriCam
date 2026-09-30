@@ -86,7 +86,7 @@ Todo funciona **dentro de tu red local**: la app no usa servidores externos, ni 
    - **Canales**: vacío para todos, o por ejemplo `1-8, 12`. Los nombres se toman del DVR.
 4. Pulsa **Probar** para comprobar la conexión y luego **Guardar** para dejar el DVR en la lista. Repite con cada DVR.
 5. (Opcional) Crea **grupos** marcando las cámaras de cada uno.
-6. En **Pantalla**, elige cuántas cámaras por página, el cambio automático de página, la calidad y un PIN si lo quieres.
+6. En **Pantalla**, elige cuántas cámaras por página, el cambio automático de página, la calidad, la decodificación y un PIN si lo quieres.
 7. Pulsa **Guardar configuración en la TV**. La TV empieza a mostrar las cámaras.
 
 Para cambiar algo después, entra a la configuración desde el engrane de la barra superior (o la tecla menú del control) y repite el proceso. Por seguridad, el acceso desde el navegador se cierra solo a los 10 minutos o al salir de esa pantalla.
@@ -109,6 +109,7 @@ En pantallas táctiles también puedes cambiar de página deslizando hacia los l
 - **Crea un usuario solo para ver** en cada DVR (permiso de vista en vivo y solo los canales necesarios) y úsalo en la app, en lugar del administrador.
 - **Usa la calidad baja (substream)** en la cuadrícula: es la opción por defecto y es la que permite ver varias cámaras a la vez con fluidez.
 - **Para que las cámaras aparezcan más rápido** al cambiar de página, configura en el DVR el *intervalo de I-frame* del substream igual a los FPS (por ejemplo 15 si graba a 15 fps).
+- **Si la TV se traba o se reinicia** al cambiar de página o al ampliar una cámara: baja las cámaras por página, desactiva en **Pantalla** la *calidad alta en pantalla completa* y, si sigue, la *decodificación por hardware*. En el DVR conviene que el substream sea H.264 de baja resolución (por ejemplo 640×480, 15 fps).
 - **Cuidado con las contraseñas equivocadas**: los Hikvision bloquean la IP que falla varias veces seguidas durante unos 30 minutos. La app no reintenta cuando la contraseña es rechazada, para no provocar ese bloqueo.
 
 ## Seguridad y privacidad

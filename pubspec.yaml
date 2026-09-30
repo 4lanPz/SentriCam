@@ -1,7 +1,7 @@
 name: camaras_tv
 description: SentriCam, visor de cámaras de DVR/NVR Hikvision para Android TV
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

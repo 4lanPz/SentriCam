@@ -88,7 +88,7 @@ Everything works **inside your local network**: the app uses no external servers
    - **Canales** (Channels): leave empty for all of them, or for example `1-8, 12`. Names are taken from the DVR.
 4. Press **Probar** (Test) to check the connection, then **Guardar** (Save) to add the DVR to the list. Repeat for each DVR.
 5. (Optional) Create **groups** by ticking the cameras for each one.
-6. Under **Pantalla** (Display), choose cameras per page, automatic page switching, quality and an optional PIN.
+6. Under **Pantalla** (Display), choose cameras per page, automatic page switching, quality, decoding and an optional PIN.
 7. Press **Guardar configuración en la TV** (Save settings to the TV). The TV starts showing the cameras.
 
 To change anything later, open the settings from the gear icon in the top bar (or the remote's menu key) and repeat the process. For security, browser access closes automatically after 10 minutes or when you leave that screen.
@@ -111,6 +111,7 @@ On touch screens you can also swipe sideways to change page.
 - **Create a view-only user** on each DVR (live view permission, only the channels you need) and use it in the app instead of the administrator account.
 - **Use low quality (substream)** in the grid: it's the default and it's what lets you watch several cameras at once smoothly.
 - **To make cameras appear faster** when changing page, set the substream's *I-frame interval* on the DVR equal to its FPS (for example 15 if it records at 15 fps).
+- **If the TV freezes or reboots** when changing page or opening a camera full screen: lower the cameras per page, turn off *high quality in full screen* under **Pantalla** (Display) and, if it still happens, *hardware decoding*. On the DVR, the substream should ideally be low-resolution H.264 (for example 640×480, 15 fps).
 - **Beware of wrong passwords**: Hikvision devices lock out an IP address for about 30 minutes after several failed attempts. The app does not retry when a password is rejected, to avoid triggering that lockout.
 
 ## Security and privacy

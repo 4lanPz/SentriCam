@@ -29,19 +29,26 @@ label>input,label>select{margin-top:4px;color:var(--texto)}
 .check{display:flex;align-items:center;gap:8px;margin:10px 0;color:var(--texto)}
 .check input[type=number]{width:6em}
 .opciones{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 20px}
-.msg{margin-top:10px;white-space:pre-wrap}.msg.ok{color:var(--ok)}.msg.error{color:var(--mal)}
-table{width:100%;border-collapse:collapse}
-th{text-align:left;font-size:13px;color:var(--suave);font-weight:500;padding:4px 6px}
-td{padding:6px;vertical-align:top}
-tr.fila>td{border-top:1px solid var(--borde)}
-td.acciones{display:flex;gap:6px;flex-wrap:wrap}
-td.texto{padding-top:13px}
-.estado{display:inline-block;font-size:12px;border-radius:10px;padding:1px 8px;margin-top:4px;border:1px solid var(--borde);color:var(--suave)}
-.estado.ok{color:var(--ok);border-color:var(--ok)}.estado.mal{color:var(--mal);border-color:var(--mal)}
-.detalle td{padding-top:0}
-.pasos{background:#0d0d0d;border:1px solid var(--borde);border-radius:6px;padding:8px 10px;font-size:14px}
-.pasos div{margin:2px 0}.pasos .ok{color:var(--ok)}.pasos .mal{color:var(--mal)}
-.error-fila{color:var(--mal);font-size:14px}
+.msg{margin-top:10px;white-space:pre-wrap}.msg:empty{display:none}.msg.ok{color:var(--ok)}.msg.error{color:var(--mal)}
+.dvr{border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+/* Cada campo crece hasta un máximo según lo que suele contener (una IP no necesita todo el ancho). */
+.campos{display:flex;flex-wrap:wrap;gap:8px 10px}
+.campos label{flex:1 1 var(--base);max-width:var(--max);min-width:0}
+.c-nombre{--base:12rem;--max:18rem}
+.c-ip{--base:9.5rem;--max:11rem}
+.c-puerto{--base:5rem;--max:6rem}
+.c-usuario,.c-clave{--base:8.5rem;--max:15rem}
+.c-canales{--base:8.5rem;--max:14rem}
+.pie{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.dvr>.pie:first-child{margin-top:0}
+.acciones{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.resumen{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;min-width:0}
+.datos{color:var(--suave);font-size:14px;overflow-wrap:anywhere}
+.estado{display:inline-block;font-size:12px;border-radius:10px;padding:1px 8px;border:1px solid var(--borde);color:var(--suave);white-space:nowrap}
+.estado.ok{color:var(--ok);border-color:var(--ok)}.estado.mal{color:var(--mal);border-color:var(--mal);cursor:help}
+.avisos{position:relative;margin-top:8px;padding:6px 32px 6px 10px;border:1px solid var(--mal);border-radius:6px;color:var(--mal);font-size:14px}
+.avisos:empty{display:none}
+.avisos .cerrar{position:absolute;top:3px;right:3px;padding:0 7px;border:0;background:none;color:var(--suave)}
 .grupo{border:1px solid var(--borde);border-radius:8px;padding:12px;margin-bottom:12px}
 .grupo-cabecera{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
 .grupo-cabecera input{flex:1 1 14em}.contador{color:var(--acento);font-size:14px;white-space:nowrap}
@@ -51,12 +58,8 @@ summary .nombre{flex:1}summary button{padding:2px 8px;font-size:13px}
 .camaras{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 12px;padding:6px 0 4px 18px}
 .camaras label{display:flex;gap:6px;align-items:center;color:var(--texto);font-size:14px}
 .vacio{color:var(--suave);font-size:14px;padding:6px 0 4px 18px}
-@media (max-width:820px){
-  table,thead,tbody,tr,td{display:block}thead{display:none}
-  tr.fila{border:1px solid var(--borde);border-radius:8px;padding:6px;margin-top:10px}
-  tr.fila>td{border-top:0;padding:4px 6px}
-  td[data-l]::before{content:attr(data-l);display:block;font-size:12px;color:var(--suave)}
-  td.texto{padding-top:4px}
+@media (max-width:480px){
+  body{padding:10px}.tarjeta{padding:12px}.dvr{padding:8px}
 }
 </style></head>
 <body>
@@ -75,13 +78,9 @@ summary .nombre{flex:1}summary button{padding:2px 8px;font-size:13px}
 <main id="editor" hidden>
   <section class="tarjeta">
     <h2>DVRs</h2>
-    <p class="ayuda">Llena los datos y pulsa <b>Probar</b> para comprobar la conexión; luego <b>Guardar</b> para dejarlo en la lista.
-      Puerto: el de video RTSP (normalmente 554). Canales: vacío = todos, o por ejemplo <i>1-8, 12</i>.
-      Los nombres de las cámaras se toman del DVR.</p>
-    <table>
-      <thead><tr><th>Nombre</th><th>IP</th><th>Puerto</th><th>Usuario</th><th>Contraseña</th><th>Canales</th><th></th></tr></thead>
-      <tbody id="dvrs"></tbody>
-    </table>
+    <p class="ayuda">Llena los datos, pulsa <b>Probar</b> y luego <b>Guardar</b>.
+      Puerto: el de video RTSP (normalmente 554). Canales: vacío = todos, o por ejemplo <i>1-8, 12</i>.</p>
+    <div id="dvrs"></div>
     <p><button id="anadirDvr">+ Añadir DVR</button></p>
   </section>
 
@@ -105,7 +104,9 @@ summary .nombre{flex:1}summary button{padding:2px 8px;font-size:13px}
     </div>
     <label class="check"><input type="checkbox" id="rotar"> Cambiar de página automáticamente cada
       <input type="number" id="segundos" min="10" step="5" value="30"> segundos</label>
-    <label class="check"><input type="checkbox" id="substream"> Calidad liviana en la cuadrícula (recomendado; la pantalla completa usa calidad alta)</label>
+    <label class="check"><input type="checkbox" id="substream"> Calidad liviana en la cuadrícula (recomendado)</label>
+    <label class="check"><input type="checkbox" id="completaAlta"> Pantalla completa en calidad alta (desactívalo si la TV se traba al ampliar una cámara)</label>
+    <label class="check"><input type="checkbox" id="hardware"> Decodificación por hardware (recomendado; desactívalo si la TV se cuelga o se reinicia)</label>
   </section>
 
   <section class="tarjeta">
@@ -135,10 +136,14 @@ function el(tag, props, ...hijos) {
   return e;
 }
 
-function aviso(id, texto, ok) {
+const temporizadores = {};
+// Con "segundos" el aviso se borra solo.
+function aviso(id, texto, ok, segundos) {
   const m = $(id);
   m.textContent = texto;
   m.className = "msg " + (ok ? "ok" : "error");
+  clearTimeout(temporizadores[id]);
+  if (segundos) temporizadores[id] = setTimeout(() => { m.textContent = ""; }, segundos * 1000);
 }
 
 async function api(ruta, cuerpo) {
@@ -219,6 +224,8 @@ function cargar(c) {
     sel: new Set((g.camaras || []).filter(r => idDe(r.dvr)).map(r => `${idDe(r.dvr)}#${r.canal}`))}));
   $("porPagina").value = String(c.camarasPorPagina || 9);
   $("substream").checked = c.substream !== false;
+  $("completaAlta").checked = c.pantallaCompletaAlta !== false;
+  $("hardware").checked = c.decodificacionHardware !== false;
   $("rotar").checked = (c.rotacionSegundos || 0) > 0;
   $("segundos").value = (c.rotacionSegundos || 0) > 0 ? c.rotacionSegundos : 30;
   $("pin").value = c.pin || "";
@@ -235,7 +242,7 @@ async function conectar() {
     const d = await api("/actual", {});
     cargar(d.config);
     $("editor").hidden = false;
-    aviso("msgAcceso", "Conectado. Los cambios se aplican en la TV al pulsar \"Guardar configuración en la TV\".", true);
+    aviso("msgAcceso", "Conectado.", true, 4);
   } catch (e) {
     aviso("msgAcceso", e.message, false);
   } finally {
@@ -278,18 +285,20 @@ async function probarDvr(d) {
   pintarDvrs();
   try {
     const r = await api("/probar", {dvr: datosDvr(d)});
-    d.prueba = {pasos: r.pasos};
+    d.prueba = {pasos: r.pasos, canales: (r.canales || []).length};
     for (const c of r.canales || []) d.conocidos.set(c.canal, c.nombre || `Cámara ${c.canal}`);
   } catch (e) {
-    d.prueba = {pasos: [{ok: false, texto: e.message}]};
+    d.prueba = {pasos: [{ok: false, texto: e.message}], canales: 0};
   }
+  d.verAvisos = true;
   pintarDvrs();
   pintarGrupos();
 }
 
 function guardarDvr(d) {
   d.error = validarDvr(d);
-  if (!d.error) { d.editando = false; d.respaldo = null; }
+  // Guardado: el detalle de la prueba se oculta (sigue en el globo del estado).
+  if (!d.error) { d.editando = false; d.respaldo = null; d.verAvisos = false; }
   pintarDvrs();
   pintarGrupos();
 }
@@ -317,65 +326,94 @@ function eliminarDvr(d) {
   pintarGrupos();
 }
 
+// Si todo salió bien basta el estado; el detalle completo queda en su globo (title).
 function estadoPrueba(d) {
   if (!d.prueba) return el("span", {clase: "estado", texto: "sin probar"});
   if (d.prueba.cargando) return el("span", {clase: "estado", texto: "probando…"});
   const ok = d.prueba.pasos.every(p => p.ok);
-  return el("span", {clase: "estado " + (ok ? "ok" : "mal"), texto: ok ? "✓ funciona" : "✗ revisar"});
+  const n = d.prueba.canales;
+  return el("span", {clase: "estado " + (ok ? "ok" : "mal"),
+    texto: ok ? (n ? `✓ funciona · ${n} cámaras` : "✓ funciona") : "✗ revisar",
+    title: d.prueba.pasos.map(p => (p.ok ? "✓ " : "✗ ") + p.texto).join("\n")});
 }
 
-function campo(d, clave, etiqueta, extra) {
-  return el("td", {"data-l": etiqueta}, el("input", Object.assign({
-    value: d[clave], "aria-label": etiqueta,
-    oninput: e => { d[clave] = e.target.value; sinGuardar = true; },
+// Solo se muestran los errores (de validación o los pasos fallidos de la prueba).
+function llenarAvisos(cont, d) {
+  const lineas = [];
+  if (d.error) lineas.push(d.error);
+  if (d.verAvisos && d.prueba && d.prueba.pasos) for (const p of d.prueba.pasos) if (!p.ok) lineas.push(p.texto);
+  cont.replaceChildren();
+  if (!lineas.length) return;
+  cont.append(el("button", {clase: "cerrar", texto: "✕", title: "Ocultar", "aria-label": "Ocultar",
+    onclick: () => { d.error = ""; d.verAvisos = false; refrescarEstado(d); }}),
+    ...lineas.map(t => el("div", {texto: t})));
+}
+
+// Actualiza estado y avisos sin repintar la fila (no se pierde el foco del campo).
+function refrescarEstado(d) {
+  if (!d.nodos) return;
+  const estado = estadoPrueba(d);
+  d.nodos.estado.replaceWith(estado);
+  d.nodos.estado = estado;
+  llenarAvisos(d.nodos.avisos, d);
+}
+
+// Al cambiar un dato, la prueba y el error anteriores ya no corresponden.
+function datosCambiados(d) {
+  if ((d.prueba && d.prueba.cargando) || (!d.prueba && !d.error)) return;
+  d.prueba = null;
+  d.error = "";
+  refrescarEstado(d);
+}
+
+function campo(d, clave, etiqueta, clase, extra) {
+  return el("label", {clase}, etiqueta, el("input", Object.assign({
+    value: d[clave],
+    oninput: e => { d[clave] = e.target.value; sinGuardar = true; datosCambiados(d); },
   }, extra || {})));
 }
 
 function pintarDvrs() {
-  // Un aviso de error de "Guardar configuración" queda viejo al cambiar la tabla.
+  // Un aviso de error de "Guardar configuración" queda viejo al cambiar la lista.
   if ($("msgGuardar").classList.contains("error")) $("msgGuardar").textContent = "";
-  const tb = $("dvrs");
-  tb.replaceChildren();
+  const cont = $("dvrs");
+  cont.replaceChildren();
   for (const d of dvrs) {
     const ocupado = !!(d.prueba && d.prueba.cargando);
     const probar = el("button", {texto: ocupado ? "Probando…" : "Probar", disabled: ocupado, onclick: () => probarDvr(d)});
-    let fila;
+    const estado = estadoPrueba(d);
+    const avisos = el("div", {clase: "avisos"});
+    d.nodos = {estado, avisos};
+    llenarAvisos(avisos, d);
+    let caja;
     if (d.editando) {
-      fila = el("tr", {clase: "fila"},
-        el("td", {"data-l": "Nombre"},
-          el("input", {value: d.nombre, "aria-label": "Nombre", placeholder: "Ej.: Planta 1",
-            oninput: e => { d.nombre = e.target.value; sinGuardar = true; }}), estadoPrueba(d)),
-        campo(d, "host", "IP", {placeholder: "192.168.1.64", inputMode: "decimal"}),
-        campo(d, "puerto", "Puerto", {inputMode: "numeric", size: 5}),
-        campo(d, "usuario", "Usuario", {autocomplete: "off"}),
-        campo(d, "clave", "Contraseña", {type: "password", autocomplete: "new-password",
-          placeholder: d.claveGuardada ? "(sin cambios)" : ""}),
-        campo(d, "canales", "Canales", {placeholder: "todos"}),
-        el("td", {clase: "acciones"}, probar,
-          el("button", {clase: "primario", texto: "Guardar", onclick: () => guardarDvr(d)}),
-          d.respaldo
-            ? el("button", {texto: "Cancelar", onclick: () => cancelarDvr(d)})
-            : el("button", {clase: "peligro", texto: "Eliminar", onclick: () => eliminarDvr(d)})));
+      caja = el("div", {clase: "dvr"},
+        el("div", {clase: "campos"},
+          campo(d, "nombre", "Nombre", "c-nombre", {placeholder: "Ej.: Planta 1"}),
+          campo(d, "host", "IP", "c-ip", {placeholder: "192.168.1.64", inputMode: "decimal", maxLength: 15}),
+          campo(d, "puerto", "Puerto", "c-puerto", {inputMode: "numeric", maxLength: 5}),
+          campo(d, "usuario", "Usuario", "c-usuario", {autocomplete: "off"}),
+          campo(d, "clave", "Contraseña", "c-clave", {type: "password", autocomplete: "new-password",
+            placeholder: d.claveGuardada ? "(sin cambios)" : ""}),
+          campo(d, "canales", "Canales", "c-canales", {placeholder: "todos"})),
+        el("div", {clase: "pie"}, estado,
+          el("span", {clase: "acciones"}, probar,
+            el("button", {clase: "primario", texto: "Guardar", onclick: () => guardarDvr(d)}),
+            d.respaldo
+              ? el("button", {texto: "Cancelar", onclick: () => cancelarDvr(d)})
+              : el("button", {clase: "peligro", texto: "Eliminar", onclick: () => eliminarDvr(d)}))),
+        avisos);
     } else {
-      fila = el("tr", {clase: "fila"},
-        el("td", {clase: "texto", "data-l": "Nombre"}, el("b", {texto: d.nombre}), el("br"), estadoPrueba(d)),
-        el("td", {clase: "texto", "data-l": "IP", texto: d.host}),
-        el("td", {clase: "texto", "data-l": "Puerto", texto: d.puerto}),
-        el("td", {clase: "texto", "data-l": "Usuario", texto: d.usuario}),
-        el("td", {clase: "texto", "data-l": "Contraseña", texto: d.clave || d.claveGuardada ? "••••••" : "—"}),
-        el("td", {clase: "texto", "data-l": "Canales", texto: d.canales || "todos"}),
-        el("td", {clase: "acciones"}, probar,
-          el("button", {texto: "Editar", onclick: () => editarDvr(d)}),
-          el("button", {clase: "peligro", texto: "Eliminar", onclick: () => eliminarDvr(d)})));
+      const datos = `${d.host}:${d.puerto} · ${d.usuario} · canales: ${d.canales || "todos"}`;
+      caja = el("div", {clase: "dvr"},
+        el("div", {clase: "pie"},
+          el("span", {clase: "resumen"}, el("b", {texto: d.nombre}), estado, el("span", {clase: "datos", texto: datos})),
+          el("span", {clase: "acciones"}, probar,
+            el("button", {texto: "Editar", onclick: () => editarDvr(d)}),
+            el("button", {clase: "peligro", texto: "Eliminar", onclick: () => eliminarDvr(d)}))),
+        avisos);
     }
-    tb.append(fila);
-    const extra = [];
-    if (d.error) extra.push(el("div", {clase: "error-fila", texto: d.error}));
-    if (d.prueba && d.prueba.pasos) {
-      extra.push(el("div", {clase: "pasos"}, ...d.prueba.pasos.map(p =>
-        el("div", {clase: p.ok ? "ok" : "mal", texto: (p.ok ? "✓ " : "✗ ") + p.texto}))));
-    }
-    if (extra.length) tb.append(el("tr", {clase: "detalle"}, el("td", {colSpan: 7}, ...extra)));
+    cont.append(caja);
   }
 }
 
@@ -472,6 +510,7 @@ function armarConfig() {
     if (!Number.isInteger(rotacion) || rotacion < 10) throw new Error("El cambio automático de página debe ser de al menos 10 segundos.");
   }
   return {camarasPorPagina: Number($("porPagina").value), substream: $("substream").checked,
+    pantallaCompletaAlta: $("completaAlta").checked, decodificacionHardware: $("hardware").checked,
     rotacionSegundos: rotacion, pin, dvrs: dvrs.map(datosDvr), grupos: salida};
 }
 
@@ -500,7 +539,7 @@ $("codigo").addEventListener("keydown", e => { if (e.key === "Enter") conectar()
 $("anadirDvr").addEventListener("click", () => { nuevoDvr(); sinGuardar = true; pintarDvrs(); });
 $("anadirGrupo").addEventListener("click", nuevoGrupo);
 $("guardarTodo").addEventListener("click", guardarTodo);
-for (const id of ["porPagina", "rotar", "segundos", "substream", "pin"]) $(id).addEventListener("change", () => { sinGuardar = true; });
+for (const id of ["porPagina", "rotar", "segundos", "substream", "completaAlta", "hardware", "pin"]) $(id).addEventListener("change", () => { sinGuardar = true; });
 window.addEventListener("beforeunload", e => { if (sinGuardar) { e.preventDefault(); e.returnValue = ""; } });
 </script>
 </body></html>''';

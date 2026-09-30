@@ -156,6 +156,15 @@ class ConfigApp {
   final List<Grupo> grupos;
   final int porPagina;
   final bool substream;
+
+  /// Pantalla completa en calidad principal; en falso usa el substream
+  /// (para TV que se traban al ampliar una cámara).
+  final bool completaAlta;
+
+  /// Decodificar el video con el chip de la TV (MediaCodec). En falso se
+  /// decodifica por software: más carga de CPU, pero evita fallas del
+  /// decodificador de algunas TV.
+  final bool hardware;
   final int rotacionSegundos;
   final String? pin;
 
@@ -164,6 +173,8 @@ class ConfigApp {
     this.grupos = const [],
     this.porPagina = 9,
     this.substream = true,
+    this.completaAlta = true,
+    this.hardware = true,
     this.rotacionSegundos = 0,
     this.pin,
   });
@@ -173,6 +184,8 @@ class ConfigApp {
         grupos: grupos ?? this.grupos,
         porPagina: porPagina,
         substream: substream,
+        completaAlta: completaAlta,
+        hardware: hardware,
         rotacionSegundos: rotacionSegundos,
         pin: pin,
       );
@@ -206,6 +219,8 @@ class ConfigApp {
   Map<String, dynamic> toJson({bool incluirClaves = true}) => {
         'camarasPorPagina': porPagina,
         'substream': substream,
+        'pantallaCompletaAlta': completaAlta,
+        'decodificacionHardware': hardware,
         'rotacionSegundos': rotacionSegundos,
         'pin': pin ?? '',
         'dvrs': dvrs.map((d) => d.toJson(incluirClave: incluirClaves)).toList(),
@@ -223,6 +238,8 @@ class ConfigApp {
           .toList(),
       porPagina: (j['camarasPorPagina'] as num?)?.toInt() ?? 9,
       substream: j['substream'] as bool? ?? true,
+      completaAlta: j['pantallaCompletaAlta'] as bool? ?? true,
+      hardware: j['decodificacionHardware'] as bool? ?? true,
       rotacionSegundos: (j['rotacionSegundos'] as num?)?.toInt() ?? 0,
       pin: pinTxt.isEmpty ? null : pinTxt,
     );

@@ -7,13 +7,32 @@ import 'package:media_kit_video/media_kit_video.dart';
 /// Reproduce un flujo RTSP y se reconecta solo si se cae.
 /// Si cambia [url] (otra página de la cuadrícula), reutiliza el mismo
 /// reproductor en vez de crear uno nuevo: es más rápido y liviano.
+/// Para no pedirle a la TV varios decodificadores de golpe (algunas se cuelgan
+/// o se reinician), cada cuadro abre su video tras [retraso].
 /// Importante: nunca imprimir la URL en logs, contiene la contraseña.
 /// Los mensajes que se muestran en pantalla pasan por [_sanear] para quitar
 /// la URL y la contraseña antes de mostrarse.
 class VistaCamara extends StatefulWidget {
   final String url;
   final String nombre;
-  const VistaCamara({super.key, required this.url, required this.nombre});
+
+  /// Espera antes de abrir el video, contada después de detener el anterior.
+  final Duration retraso;
+
+  /// false = decodificación por software (ver `ConfigApp.hardware`).
+  final bool hardware;
+
+  /// Hilos del decodificador por software; null = los que decida mpv.
+  final int? hilosSoftware;
+
+  const VistaCamara({
+    super.key,
+    required this.url,
+    required this.nombre,
+    this.retraso = Duration.zero,
+    this.hardware = true,
+    this.hilosSoftware,
+  });
 
   @override
   State<VistaCamara> createState() => _VistaCamaraState();
@@ -21,6 +40,10 @@ class VistaCamara extends StatefulWidget {
 
 class _VistaCamaraState extends State<VistaCamara> {
   static const _limiteSinImagen = Duration(seconds: 20);
+
+  /// Al crearse, el reproductor que se cerró antes (la cuadrícula o la
+  /// pantalla completa) puede estar liberando todavía su decodificador.
+  static const _esperaAlCrear = Duration(milliseconds: 600);
 
   late final Player _player;
   late final VideoController _controller;
@@ -42,14 +65,19 @@ class _VistaCamaraState extends State<VistaCamara> {
     _player = Player(
       configuration: const PlayerConfiguration(logLevel: MPVLogLevel.warn),
     );
-    _controller = VideoController(_player);
+    _controller = VideoController(
+      _player,
+      configuration: VideoControllerConfiguration(
+        enableHardwareAcceleration: widget.hardware,
+      ),
+    );
     _iniciar();
   }
 
   Future<void> _iniciar() async {
     final nativo = _player.platform;
     if (nativo is NativePlayer) {
-      const opciones = {
+      final opciones = {
         // TCP evita imagen gris o cortada; sin caché para menor retraso.
         'rtsp-transport': 'tcp',
         'cache': 'no',
@@ -64,6 +92,9 @@ class _VistaCamaraState extends State<VistaCamara> {
         // Tope de memoria por cámara (por defecto mpv permite ~150 MB).
         'demuxer-max-bytes': '2MiB',
         'demuxer-max-back-bytes': '0',
+        // Por software, varias cámaras con todos los hilos cada una saturan la CPU.
+        if (!widget.hardware && widget.hilosSoftware != null)
+          'vd-lavc-threads': '${widget.hilosSoftware}',
       };
       for (final o in opciones.entries) {
         await nativo.setProperty(o.key, o.value);
@@ -103,7 +134,7 @@ class _VistaCamaraState extends State<VistaCamara> {
     }));
 
     _preparado = true;
-    _abrir();
+    _abrir(espera: _esperaAlCrear);
   }
 
   @override
@@ -134,26 +165,32 @@ class _VistaCamaraState extends State<VistaCamara> {
     }
   }
 
-  Future<void> _abrir() async {
+  Future<void> _abrir({Duration espera = Duration.zero}) async {
     if (!mounted) return;
     final apertura = ++_apertura;
     _gracia?.cancel();
     _gracia = null;
     _reintento?.cancel();
+    _limite?.cancel();
     _errorMpv = null;
     _registros.clear();
     setState(() {
       _cargando = true;
       _conError = false;
     });
-    _limite?.cancel();
-    _limite = Timer(_limiteSinImagen, () {
-      if (mounted && _cargando) _programarReintento();
-    });
-    // stop() deja la posición en cero: así se detecta la imagen de la cámara nueva.
+    // stop() deja la posición en cero: así se detecta la imagen de la cámara
+    // nueva. También libera el decodificador antes de pedir el siguiente.
     await _player.stop();
     // Si mientras tanto se pidió otra cámara, esa apertura manda.
     if (!mounted || apertura != _apertura) return;
+    final total = espera + widget.retraso;
+    if (total > Duration.zero) {
+      await Future<void>.delayed(total);
+      if (!mounted || apertura != _apertura) return;
+    }
+    _limite = Timer(_limiteSinImagen, () {
+      if (mounted && _cargando) _programarReintento();
+    });
     await _player.open(Media(widget.url));
   }
 

@@ -180,6 +180,8 @@ class ServidorConfig {
   static const _porDefecto = {
     'camarasPorPagina': 9,
     'substream': true,
+    'pantallaCompletaAlta': true,
+    'decodificacionHardware': true,
     'rotacionSegundos': 0,
     'pin': '',
     'dvrs': <Object>[],

@@ -323,20 +323,19 @@ Future<PasoPrueba> _probarRtsp(Dvr dvr) async {
         .first
         .timeout(const Duration(seconds: 5));
     if (primera.startsWith('RTSP/')) {
-      return PasoPrueba(
-          true, 'Video (RTSP) en el puerto ${dvr.puerto}: responde.');
+      return PasoPrueba(true, 'Puerto RTSP ${dvr.puerto}: responde.');
     }
     return PasoPrueba(false,
-        'El puerto ${dvr.puerto} responde, pero no es un servicio de video RTSP. Revisa el puerto RTSP.');
+        'El puerto ${dvr.puerto} no es de video RTSP. Revisa el puerto.');
   } on TimeoutException {
     return PasoPrueba(false,
-        'El puerto de video ${dvr.puerto} conecta pero no contesta. Revisa el puerto RTSP del DVR.');
+        'El puerto ${dvr.puerto} conecta pero no contesta. Revisa el puerto RTSP.');
   } on SocketException {
     return PasoPrueba(false,
-        'No se pudo conectar al puerto de video ${dvr.host}:${dvr.puerto}. Revisa la IP, la red y el puerto RTSP.');
+        'Sin conexión con ${dvr.host}:${dvr.puerto}. Revisa la IP y el puerto RTSP.');
   } catch (_) {
-    return PasoPrueba(false,
-        'El puerto de video ${dvr.puerto} no respondió como se esperaba.');
+    return PasoPrueba(
+        false, 'El puerto ${dvr.puerto} no respondió como se esperaba.');
   } finally {
     socket?.destroy();
   }
@@ -409,29 +408,25 @@ Future<PasoPrueba> _probarVideo(Dvr dvr, int canal) async {
       await _codigoDescribe(dvr, '/Streaming/Channels/${canal * 100 + 2}');
   switch (codigo) {
     case 200:
-      return PasoPrueba(true,
-          'Video del canal $canal: el DVR lo entrega con este usuario y contraseña.');
+      return PasoPrueba(true, 'Video del canal $canal: correcto.');
     case 401:
       return const PasoPrueba(
           false,
-          'Video (RTSP): usuario o contraseña rechazados. Si en la web del DVR sí entras, '
-          'este equipo puede estar bloqueado por intentos fallidos: espera unos 30 minutos.');
+          'Video: usuario o contraseña rechazados (o la TV quedó bloqueada '
+          '~30 min por intentos fallidos).');
     case 404:
       final antigua =
           await _codigoDescribe(dvr, '/h264/ch$canal/sub/av_stream');
       if (antigua == 200) {
-        return const PasoPrueba(
-            false,
-            'Este DVR usa el formato antiguo de dirección de video (/h264/...), '
-            'que la app todavía no soporta.');
+        return const PasoPrueba(false,
+            'El DVR usa la dirección de video antigua (/h264/...), aún no soportada.');
       }
       return PasoPrueba(false, 'El canal $canal no existe en el DVR.');
     case null:
       return const PasoPrueba(
           false, 'No se pudo completar la prueba de video.');
     default:
-      return PasoPrueba(
-          false, 'El DVR respondió con el error $codigo al pedir el video.');
+      return PasoPrueba(false, 'Video: el DVR respondió con el error $codigo.');
   }
 }
 
@@ -452,11 +447,10 @@ Future<ResultadoPrueba> probarDvr(Dvr dvr) async {
   try {
     canales = await descubrirCanales(dvr);
     if (canales.isEmpty) {
-      pasos.add(const PasoPrueba(
-          true, 'Web del DVR: usuario y contraseña correctos.'));
+      pasos.add(const PasoPrueba(true, 'Usuario y contraseña correctos.'));
     } else {
-      pasos.add(PasoPrueba(true,
-          'Web del DVR: usuario y contraseña correctos. El DVR tiene ${canales.length} canales.'));
+      pasos.add(PasoPrueba(
+          true, 'Usuario y contraseña correctos (${canales.length} canales).'));
       final existentes = canales.map((c) => c.canal).toSet();
       final ausentes = dvr.camaras
           .map((c) => c.canal)
@@ -466,7 +460,7 @@ Future<ResultadoPrueba> probarDvr(Dvr dvr) async {
         ..sort();
       if (ausentes.isNotEmpty) {
         pasos.add(PasoPrueba(false,
-            'Estos canales configurados no aparecen en la lista del DVR: ${ausentes.join(', ')}.'));
+            'Canales que no existen en el DVR: ${ausentes.join(', ')}.'));
       }
     }
   } on ErrorDvr catch (e) {
@@ -474,14 +468,13 @@ Future<ResultadoPrueba> probarDvr(Dvr dvr) async {
     pasos.add(PasoPrueba(
         false,
         e.noDisponible
-            ? 'Web del DVR: no permite consultar la lista de canales (modelo antiguo). '
-                'No afecta al video.'
+            ? 'No se pudo leer la lista de canales (modelo antiguo); el video no se afecta.'
             : 'Web del DVR: ${e.mensaje}'));
   }
   if (claveRechazada) {
     // Otro intento fallido acerca el bloqueo de la cuenta en el DVR.
     pasos.add(const PasoPrueba(
-        false, 'No se probó el video para no bloquear la cuenta del DVR.'));
+        false, 'Video sin probar, para no bloquear la cuenta del DVR.'));
   } else if (rtsp.ok) {
     final canal = dvr.camaras.isNotEmpty
         ? dvr.camaras.first.canal

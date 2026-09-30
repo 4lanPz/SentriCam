@@ -35,6 +35,10 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
   Timer? _rotacion;
   final _primerNodo = FocusNode();
 
+  /// Contiene los botones de arriba; si el foco está ahí, cambiar de página
+  /// no lo mueve (se puede seguir pulsando la flecha).
+  final _barra = FocusNode(canRequestFocus: false, skipTraversal: true);
+
   List<VistaRef> get _vistas => _config.vistasDe(_seleccion);
 
   int get _totalPaginas => max(1, (_vistas.length / _config.porPagina).ceil());
@@ -78,7 +82,7 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
   void _irA(int p) {
     final total = _totalPaginas;
     setState(() => _pagina = ((p % total) + total) % total);
-    _enfocarPrimera();
+    if (!_barra.hasFocus) _enfocarPrimera();
   }
 
   void _cambioManual(int delta) {
@@ -226,6 +230,7 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
   void dispose() {
     _rotacion?.cancel();
     _primerNodo.dispose();
+    _barra.dispose();
     super.dispose();
   }
 
@@ -248,6 +253,9 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
     final pagina =
         _vistas.skip(paginaSegura * porPagina).take(porPagina).toList();
     const espacio = 2.0;
+    // Las cámaras de la página se abren de a una, repartidas en unos 3 s:
+    // pedir todos los decodificadores de golpe cuelga a algunas TV.
+    final paso = min(350, 3000 ~/ porPagina);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -258,69 +266,66 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
           onKeyEvent: _teclas,
           child: Column(
             children: [
-              SizedBox(
-                height: 40,
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon:
-                          const Icon(Icons.chevron_left, color: Colors.white70),
-                      tooltip: 'Página anterior',
-                      onPressed:
-                          totalPaginas > 1 ? () => _cambioManual(-1) : null,
-                    ),
-                    Text(
-                      'Página ${paginaSegura + 1} de $totalPaginas',
-                      style: const TextStyle(color: Colors.white70),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right,
-                          color: Colors.white70),
-                      tooltip: 'Página siguiente',
-                      onPressed:
-                          totalPaginas > 1 ? () => _cambioManual(1) : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      child: Text(
-                        _seleccion?.nombre ?? 'Todas las cámaras',
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            const TextStyle(color: Colors.amber, fontSize: 13),
-                      ),
-                    ),
-                    const Spacer(),
-                    if (config.rotacionSegundos > 0 && totalPaginas > 1)
+              Focus(
+                focusNode: _barra,
+                child: SizedBox(
+                  height: 40,
+                  child: Row(
+                    children: [
                       IconButton(
-                        icon: Icon(
-                            _rotacionPausada ? Icons.play_arrow : Icons.pause,
-                            color: Colors.white70,
-                            size: 20),
-                        tooltip: _rotacionPausada
-                            ? 'Reanudar cambio automático de página'
-                            : 'Pausar cambio automático de página',
-                        onPressed: () => setState(
-                            () => _rotacionPausada = !_rotacionPausada),
+                        icon: const Icon(Icons.chevron_left),
+                        tooltip: 'Página anterior',
+                        onPressed:
+                            totalPaginas > 1 ? () => _cambioManual(-1) : null,
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.grid_view,
-                          color: Colors.white70, size: 20),
-                      tooltip: 'Elegir grupo o DVR',
-                      onPressed: _elegirVista,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.dns,
-                          color: Colors.white70, size: 20),
-                      tooltip: 'Administrar DVRs',
-                      onPressed: _abrirAdministrar,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.settings,
-                          color: Colors.white70, size: 20),
-                      tooltip: 'Configuración',
-                      onPressed: _abrirConfig,
-                    ),
-                  ],
+                      Text(
+                        'Página ${paginaSegura + 1} de $totalPaginas',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        tooltip: 'Página siguiente',
+                        onPressed:
+                            totalPaginas > 1 ? () => _cambioManual(1) : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          _seleccion?.nombre ?? 'Todas las cámaras',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.amber, fontSize: 13),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (config.rotacionSegundos > 0 && totalPaginas > 1)
+                        IconButton(
+                          icon: Icon(
+                              _rotacionPausada ? Icons.play_arrow : Icons.pause,
+                              size: 20),
+                          tooltip: _rotacionPausada
+                              ? 'Reanudar cambio automático de página'
+                              : 'Pausar cambio automático de página',
+                          onPressed: () => setState(
+                              () => _rotacionPausada = !_rotacionPausada),
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.grid_view, size: 20),
+                        tooltip: 'Elegir grupo o DVR',
+                        onPressed: _elegirVista,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.dns, size: 20),
+                        tooltip: 'Administrar DVRs',
+                        onPressed: _abrirAdministrar,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.settings, size: 20),
+                        tooltip: 'Configuración',
+                        onPressed: _abrirConfig,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Expanded(
@@ -366,8 +371,8 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
                                     return _Celda(
                                       focusNode: i == 0 ? _primerNodo : null,
                                       autofocus: i == 0,
-                                      onTap: () =>
-                                          _abrir(PantallaCompleta(vista: v)),
+                                      onTap: () => _abrir(PantallaCompleta(
+                                          vista: v, config: config)),
                                       child: VistaCamara(
                                         // Clave por posición: al cambiar de página cada
                                         // cuadro reutiliza su reproductor.
@@ -375,6 +380,10 @@ class _PantallaCuadriculaState extends State<PantallaCuadricula> {
                                         url: v.dvr.urlRtsp(v.camara.canal,
                                             substream: config.substream),
                                         nombre: v.camara.nombre,
+                                        retraso:
+                                            Duration(milliseconds: paso * i),
+                                        hardware: config.hardware,
+                                        hilosSoftware: 2,
                                       ),
                                     );
                                   },
@@ -432,10 +441,13 @@ class _CeldaState extends State<_Celda> {
   }
 }
 
-/// Una sola cámara en calidad principal. El botón Atrás regresa a la cuadrícula.
+/// Una sola cámara, en calidad principal salvo que la configuración diga lo
+/// contrario. El botón Atrás regresa a la cuadrícula.
 class PantallaCompleta extends StatelessWidget {
   final VistaRef vista;
-  const PantallaCompleta({super.key, required this.vista});
+  final ConfigApp config;
+  const PantallaCompleta(
+      {super.key, required this.vista, required this.config});
 
   @override
   Widget build(BuildContext context) {
@@ -443,8 +455,12 @@ class PantallaCompleta extends StatelessWidget {
       backgroundColor: Colors.black,
       body: VistaCamara(
         key: ValueKey('completa-${vista.id}'),
-        url: vista.dvr.urlRtsp(vista.camara.canal, substream: false),
+        url: vista.dvr
+            .urlRtsp(vista.camara.canal, substream: !config.completaAlta),
         nombre: '${vista.camara.nombre} · ${vista.dvr.nombre}',
+        // Da tiempo a que la cuadrícula suelte sus decodificadores.
+        retraso: const Duration(milliseconds: 400),
+        hardware: config.hardware,
       ),
     );
   }

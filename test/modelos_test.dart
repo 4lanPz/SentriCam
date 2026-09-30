@@ -92,4 +92,20 @@ void main() {
     expect(Seleccion.desdeClave('basura'), isNull);
     expect(Seleccion.desdeClave(null), isNull);
   });
+
+  test('opciones de video: por defecto activas y se conservan por JSON', () {
+    final vieja = ConfigApp.fromJson({'dvrs': []});
+    expect(vieja.completaAlta, isTrue);
+    expect(vieja.hardware, isTrue);
+
+    final c = ConfigApp.fromJson({
+      'pantallaCompletaAlta': false,
+      'decodificacionHardware': false,
+      'dvrs': [_dvr('A', '192.168.1.10').toJson()],
+    });
+    final vuelta = ConfigApp.fromJson(c.toJson());
+    expect(vuelta.completaAlta, isFalse);
+    expect(vuelta.hardware, isFalse);
+    expect(vuelta.sinDvr('A').hardware, isFalse);
+  });
 }

@@ -19,6 +19,32 @@ Future<void> main() async {
   runApp(AppCamaras(config: config));
 }
 
+/// Con el control remoto hay que ver de lejos qué está seleccionado: lo que
+/// tiene el foco se pinta en ámbar (botones con fondo ámbar e ícono negro).
+ThemeData _tema() {
+  final base = ThemeData.dark(useMaterial3: true);
+  const acento = Colors.amber;
+  bool enfocado(Set<WidgetState> s) => s.contains(WidgetState.focused);
+  // null = el color normal del botón.
+  final resaltar = ButtonStyle(
+    backgroundColor:
+        WidgetStateProperty.resolveWith((s) => enfocado(s) ? acento : null),
+    foregroundColor: WidgetStateProperty.resolveWith(
+        (s) => enfocado(s) ? Colors.black : null),
+    iconColor: WidgetStateProperty.resolveWith(
+        (s) => enfocado(s) ? Colors.black : null),
+  );
+  return base.copyWith(
+    // Listas (p. ej. "¿Qué cámaras ver?" y "Administrar DVRs").
+    focusColor: acento.withValues(alpha: 0.4),
+    iconButtonTheme: IconButtonThemeData(style: resaltar),
+    textButtonTheme: TextButtonThemeData(style: resaltar),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: resaltar),
+    filledButtonTheme: FilledButtonThemeData(style: resaltar),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: resaltar),
+  );
+}
+
 class AppCamaras extends StatelessWidget {
   final ConfigApp? config;
   const AppCamaras({super.key, this.config});
@@ -43,7 +69,7 @@ class AppCamaras extends StatelessWidget {
     return MaterialApp(
       title: 'SentriCam',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
+      theme: _tema(),
       // El botón central del control remoto funciona como "aceptar".
       shortcuts: {
         ...WidgetsApp.defaultShortcuts,

@@ -53,7 +53,7 @@ android/key.properties
 # Notas internas de desarrollo y archivos personales
 CLAUDE.md
 .claude/
-docs/contexto.md
+interno/
 privado/
 
 # APK preparados para publicar en Releases (no se versionan)
